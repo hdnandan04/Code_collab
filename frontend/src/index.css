@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Professional Tech-Noir Theme
+  - Dark blue/indigo background for a "premium" dark mode.
+  - Clean off-white text for readability.
+  - Sharp, electric cyan as the "hacker" accent color.
+  - Re-introduced a very subtle corner radius for a modern finish.
+*/
+@layer base {
+  :root {
+    --background: 220 20% 8%; /* Very dark, desaturated indigo */
+    --foreground: 220 10% 90%; /* Clean, off-white text */
+
+    --card: 220 20% 12%; /* Slightly lighter indigo card */
+    --card-foreground: 220 10% 90%;
+
+    --popover: 220 20% 6%;
+    --popover-foreground: 220 10% 90%;
+
+    --primary: 180 100% 50%; /* Electric Cyan accent */
+    --primary-foreground: 220 20% 10%; /* Dark text on buttons */
+
+    --secondary: 220 20% 15%;
+    --secondary-foreground: 220 10% 90%;
+
+    --muted: 220 20% 15%;
+    --muted-foreground: 220 10% 60%; /* Greyer text */
+
+    --accent: 180 100% 50%;
+    --accent-foreground: 220 20% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 180 50% 25%; /* Muted cyan border */
+    --input: 180 50% 25%;
+    --ring: 180 100% 50%;
+
+    --radius: 0.3rem; /* Subtle rounded corners */
+  }
+
+  /* Dark mode is the same as light mode for this theme */
+  .dark {
+    --background: 220 20% 8%; /* Very dark, desaturated indigo */
+    --foreground: 220 10% 90%; /* Clean, off-white text */
+
+    --card: 220 20% 12%; /* Slightly lighter indigo card */
+    --card-foreground: 220 10% 90%;
+
+    --popover: 220 20% 6%;
+    --popover-foreground: 220 10% 90%;
+
+    --primary: 180 100% 50%; /* Electric Cyan accent */
+    --primary-foreground: 220 20% 10%; /* Dark text on buttons */
+
+    --secondary: 220 20% 15%;
+    --secondary-foreground: 220 10% 90%;
+
+    --muted: 220 20% 15%;
+    --muted-foreground: 220 10% 60%; /* Greyer text */
+
+    --accent: 180 100% 50%;
+    --accent-foreground: 220 20% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 180 50% 25%; /* Muted cyan border */
+    --input: 180 50% 25%;
+    --ring: 180 100% 50%;
+
+    --radius: 0.3rem; /* Subtle rounded corners */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Space Mono', monospace; /* Monospace for body */
+  }
+
+  /* Specific font for hacker headings */
+  .font-vt323 {
+    font-family: 'VT323', monospace;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary/40;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary/60;
+  }
+}
+
