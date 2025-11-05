@@ -1,11 +1,20 @@
 import { Router, Request, Response } from 'express';
-import axios from 'axios';
+import axios from 'axios'; // axios is imported
 
 const router = Router();
 
 interface ExecuteRequest {
   code: string;
   language: string;
+}
+
+// Interface to match the Judge0 response
+interface Judge0Result {
+  stdout?: string;
+  stderr?: string;
+  status: { description: string };
+  time: string;
+  memory: number;
 }
 
 // Language ID mapping for Judge0
@@ -17,34 +26,28 @@ const LANGUAGE_IDS: Record<string, number> = {
   c: 50,
 };
 
-// ---
-// --- ⬇️ MOCK FUNCTION IS FIXED ⬇️ ---
-// ---
-const mockExecute = (code: string, language: string) => {
-  // Check if the code contains the word "error" to simulate a failure
+// Mock execution (fallback if no Judge0 API key)
+const mockExecute = (code: string, language: string): Judge0Result => {
   if (code.toLowerCase().includes('error')) {
     return {
-      stdout: '', // No standard output on error
-      stderr: `Mock ${language} Error:\nSyntaxError: Unexpected token "error" on line 1`, // <-- FAKE ERROR
+      stdout: '',
+      stderr: `Mock ${language} Error:\nSyntaxError: Unexpected token "error" on line 1`,
       status: { description: 'Runtime Error' },
       time: '0.01',
       memory: 1024,
     };
   }
 
-  // If no error, return mock success
   return {
     stdout: `Hello, World!\n(Mock execution - configure Judge0 for real execution)\nLanguage: ${language}\nCode length: ${code.length} characters`,
-    stderr: '', // <-- SUCCESS
+    stderr: '',
     status: { description: 'Accepted' },
     time: '0.12',
     memory: 2048,
   };
 };
-// ---
-// --- ⬆️ MOCK FUNCTION IS FIXED ⬆️ ---
-// ---
 
+// --- FIX: Added specific types for the handler parameters ---
 router.post('/', async (req: Request<{}, {}, ExecuteRequest>, res: Response) => {
   const { code, language } = req.body;
 
@@ -60,7 +63,6 @@ router.post('/', async (req: Request<{}, {}, ExecuteRequest>, res: Response) => 
   }
 
   try {
-    // Use Judge0 API if configured
     if (process.env.JUDGE0_API_KEY && process.env.JUDGE0_URL) {
       console.log('📡 Using Judge0 API for execution');
       
@@ -84,11 +86,13 @@ router.post('/', async (req: Request<{}, {}, ExecuteRequest>, res: Response) => 
         }
       );
 
-      const result = response.data;
+      // --- FIX: Explicitly typed result from Axios response ---
+      const result: Judge0Result = response.data;
       
       console.log('✅ Code executed successfully');
       
       return res.json({
+        // The check for result.stdout/stderr is now safe
         stdout: result.stdout ? Buffer.from(result.stdout, 'base64').toString() : '',
         stderr: result.stderr ? Buffer.from(result.stderr, 'base64').toString() : '',
         status: result.status.description,
@@ -96,21 +100,18 @@ router.post('/', async (req: Request<{}, {}, ExecuteRequest>, res: Response) => 
         memory: result.memory,
       });
     } else {
-      // Fallback to (now fixed) mock execution
       console.log('⚠️  Using mock execution (Judge0 not configured)');
       const result = mockExecute(code, language);
       return res.json(result);
     }
   } catch (error) {
     console.error('❌ Execution error:', error);
-
-    // --- ⬇️ IMPROVED ERROR HANDLING ⬇️ ---
-    // This makes sure API errors are also sent to the frontend console
+    
+    // --- FIX: Using the correct utility and explicit typing for error handling ---
     if (axios.isAxiosError(error) && error.response) {
       console.error('Axios error data:', error.response.data);
       return res.status(500).json({
         error: 'Execution failed',
-        // Send the *actual* error from Judge0 back
         stderr: JSON.stringify(error.response.data, null, 2),
       });
     }
@@ -119,7 +120,7 @@ router.post('/', async (req: Request<{}, {}, ExecuteRequest>, res: Response) => 
       error: 'Execution failed',
       stderr: error instanceof Error ? error.message : 'Unknown server error',
     });
-    // --- ⬆️ IMPROVED ERROR HANDLING ⬆️ ---
+    // --- END OF FIX ---
   }
 });
 
