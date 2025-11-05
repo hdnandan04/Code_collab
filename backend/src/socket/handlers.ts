@@ -5,23 +5,38 @@ import Snapshot from '../models/Snapshot';
 
 const COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F'];
 
-export const setupSocketHandlers = (io: Server) => {
-  io.on('connection', async (socket: Socket) => {
-    const { roomId, username } = socket.handshake.query as { roomId: string; username: string };
-    
-    console.log(`👤 User ${username} connecting to room ${roomId}`);
+interface AuthenticatedSocket extends Socket {
+  data: {
+    user: {
+      id: string;
+      username: string;
+    };
+  };
+}
 
-    if (!roomId || !username) {
-      console.log('❌ Missing roomId or username');
+export const setupSocketHandlers = (io: Server) => {
+  io.on('connection', async (socket: AuthenticatedSocket) => {
+    const { roomId } = socket.handshake.query as { roomId: string };
+    
+    if (!socket.data.user) {
+      console.error('❌ Socket connected without user data. Disconnecting.');
       socket.disconnect();
       return;
     }
+    
+    const { username, id: userId } = socket.data.user;
+    
+    if (!roomId) {
+      console.log('❌ Missing roomId');
+      socket.disconnect();
+      return;
+    }
+    
+    console.log(`👤 User ${username} (ID: ${userId}) connecting to room ${roomId}`);
 
     try {
-      // Join Socket.IO room
       await socket.join(roomId);
 
-      // Find or create room in database
       let room = await Room.findOne({ roomId });
       
       const userColor = COLORS[Math.floor(Math.random() * COLORS.length)];
@@ -37,45 +52,47 @@ export const setupSocketHandlers = (io: Server) => {
           roomId,
           participants: [participant],
           currentCode: '// Start coding together!',
-          language: 'javascript', // Default language on creation
+          language: 'javascript',
           version: 0,
         });
         console.log(`✅ Created new room: ${roomId}`);
       } else {
+        // This logic is correct: Remove old, add new
+        room.participants = room.participants.filter(p => p.username !== username);
         room.participants.push(participant);
         room.lastActivity = new Date();
         await room.save();
-        console.log(`✅ User joined existing room: ${roomId}`);
+        console.log(`✅ User ${username} joined existing room: ${roomId}`);
       }
 
       // Send current state to new user
-      // ** ALSO SEND THE CURRENT LANGUAGE **
       socket.emit('code-snapshot', room.currentCode);
-      socket.emit('language-update', room.language); // Send current lang to new user
+      socket.emit('language-update', room.language);
       
-      // Load chat history
       const messages = await Message.find({ roomId })
         .sort({ timestamp: 1 })
         .limit(100);
       socket.emit('chat-history', messages);
 
-      // Notify room about new participant
+      // ---
+      // --- ⬇️ BUG FIX ⬇️ ---
+      // ---
+      // Instead of sending 'user-joined', send the *entire new list*
+      // to *everyone* in the room. This stops duplicates.
       const participantsList = room.participants.map((p) => ({
         id: p.socketId,
         username: p.username,
         color: p.color,
       }));
 
-      socket.emit('room-joined', { participants: participantsList });
-      socket.to(roomId).emit('user-joined', {
-        id: socket.id,
-        username,
-        color: userColor,
-      });
+      io.to(roomId).emit('room-joined', { participants: participantsList });
+      // ---
+      // --- ⬆️ BUG FIX ⬆️ ---
+      // ---
 
       console.log(`📋 Participants in ${roomId}:`, participantsList.map(p => p.username).join(', '));
 
-      // Handle code changes with simple versioning
+      // Handle code changes
       socket.on('code-change', async (data: { roomId: string; code: string }) => {
         try {
           const room = await Room.findOne({ roomId: data.roomId });
@@ -84,19 +101,14 @@ export const setupSocketHandlers = (io: Server) => {
             room.version += 1;
             room.lastActivity = new Date();
             await room.save();
-
-            // Broadcast to all other users in room
             socket.to(data.roomId).emit('code-update', data.code);
-            console.log(`📝 Code updated in ${data.roomId} (version ${room.version})`);
           }
         } catch (error) {
           console.error('Error updating code:', error);
         }
       });
 
-      //
-      // --- NEW HANDLER ADDED HERE ---
-      //
+      // Handle language change
       socket.on('language-change', async (data: { roomId: string; language: string }) => {
         try {
           const room = await Room.findOne({ roomId: data.roomId });
@@ -104,38 +116,30 @@ export const setupSocketHandlers = (io: Server) => {
             room.language = data.language;
             room.lastActivity = new Date();
             await room.save();
-
-            // Broadcast to all other users in room
             socket.to(data.roomId).emit('language-update', data.language);
-            console.log(`🌐 Language updated in ${data.roomId} to ${data.language}`);
           }
         } catch (error) {
           console.error('Error updating language:', error);
         }
       });
-      //
-      // --- END OF NEW HANDLER ---
-      //
 
       // Handle chat messages
       socket.on('chat-message', async (data: { roomId: string; message: any }) => {
         try {
           const message = await Message.create({
             roomId: data.roomId,
-            username: data.message.username,
+            username: socket.data.user.username,
             text: data.message.text,
             timestamp: new Date(data.message.timestamp),
           });
-
-          // Broadcast to all users in room including sender
           io.to(data.roomId).emit('chat-message', message);
-          console.log(`💬 Chat message in ${data.roomId} from ${data.message.username}`);
+          console.log(`💬 Chat message in ${data.roomId} from ${socket.data.user.username}`);
         } catch (error) {
           console.error('Error saving message:', error);
         }
       });
 
-      // Handle cursor positions (ephemeral - not stored)
+      // Handle cursor positions
       socket.on('cursor-position', (data: { roomId: string; position: any }) => {
         socket.to(data.roomId).emit('cursor-update', {
           userId: socket.id,
@@ -144,7 +148,7 @@ export const setupSocketHandlers = (io: Server) => {
         });
       });
 
-      // Handle snapshot requests (save current state)
+      // Handle snapshot requests
       socket.on('request-snapshot', async (data: { roomId: string }) => {
         try {
           const room = await Room.findOne({ roomId: data.roomId });
@@ -154,14 +158,13 @@ export const setupSocketHandlers = (io: Server) => {
               code: room.currentCode,
               language: room.language,
               version: room.version,
-              createdBy: username,
+              createdBy: socket.data.user.username,
             });
             socket.emit('snapshot-saved', { success: true });
-            console.log(`📸 Snapshot saved for ${data.roomId}`);
           }
         } catch (error) {
           console.error('Error saving snapshot:', error);
-          socket.emit('snapshot-saved', { success: false, error });
+          socket.emit('snapshot-saved', { success: false, error: (error as Error).message });
         }
       });
 
@@ -169,20 +172,36 @@ export const setupSocketHandlers = (io: Server) => {
       socket.on('disconnect', async () => {
         console.log(`👋 User ${username} disconnected from room ${roomId}`);
         
+        if (!roomId) { 
+          console.error('User disconnected with no roomId.');
+          return; 
+        }
+
         try {
           const room = await Room.findOne({ roomId });
           if (room) {
             room.participants = room.participants.filter(
               (p) => p.socketId !== socket.id
             );
-            
+            await room.save(); // Don't delete, just save
+
             if (room.participants.length === 0) {
-              console.log(`🗑️  Room ${roomId} is now empty`);
-            } else {
-              await room.save();
+              console.log(`🗑️  Room ${roomId} is now empty (but not deleted)`);
             }
 
-            socket.to(roomId).emit('user-left', socket.id);
+            // ---
+            // --- ⬇️ BUG FIX ⬇️ ---
+            // ---
+            // Send the new, smaller list to everyone still in the room
+            const participantsList = room.participants.map((p) => ({
+              id: p.socketId,
+              username: p.username,
+              color: p.color,
+            }));
+            io.to(roomId).emit('room-joined', { participants: participantsList });
+            // ---
+            // --- ⬆️ BUG FIX ⬆️ ---
+            // ---
           }
         } catch (error) {
           console.error('Error handling disconnect:', error);

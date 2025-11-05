@@ -17,16 +17,33 @@ const LANGUAGE_IDS: Record<string, number> = {
   c: 50,
 };
 
-// Mock execution (fallback if no Judge0 API key)
+// ---
+// --- ⬇️ MOCK FUNCTION IS FIXED ⬇️ ---
+// ---
 const mockExecute = (code: string, language: string) => {
+  // Check if the code contains the word "error" to simulate a failure
+  if (code.toLowerCase().includes('error')) {
+    return {
+      stdout: '', // No standard output on error
+      stderr: `Mock ${language} Error:\nSyntaxError: Unexpected token "error" on line 1`, // <-- FAKE ERROR
+      status: { description: 'Runtime Error' },
+      time: '0.01',
+      memory: 1024,
+    };
+  }
+
+  // If no error, return mock success
   return {
     stdout: `Hello, World!\n(Mock execution - configure Judge0 for real execution)\nLanguage: ${language}\nCode length: ${code.length} characters`,
-    stderr: '',
+    stderr: '', // <-- SUCCESS
     status: { description: 'Accepted' },
     time: '0.12',
     memory: 2048,
   };
 };
+// ---
+// --- ⬆️ MOCK FUNCTION IS FIXED ⬆️ ---
+// ---
 
 router.post('/', async (req: Request<{}, {}, ExecuteRequest>, res: Response) => {
   const { code, language } = req.body;
@@ -79,17 +96,30 @@ router.post('/', async (req: Request<{}, {}, ExecuteRequest>, res: Response) => 
         memory: result.memory,
       });
     } else {
-      // Fallback to mock execution
+      // Fallback to (now fixed) mock execution
       console.log('⚠️  Using mock execution (Judge0 not configured)');
       const result = mockExecute(code, language);
       return res.json(result);
     }
   } catch (error) {
     console.error('❌ Execution error:', error);
+
+    // --- ⬇️ IMPROVED ERROR HANDLING ⬇️ ---
+    // This makes sure API errors are also sent to the frontend console
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('Axios error data:', error.response.data);
+      return res.status(500).json({
+        error: 'Execution failed',
+        // Send the *actual* error from Judge0 back
+        stderr: JSON.stringify(error.response.data, null, 2),
+      });
+    }
+    
     return res.status(500).json({
       error: 'Execution failed',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      stderr: error instanceof Error ? error.message : 'Unknown server error',
     });
+    // --- ⬆️ IMPROVED ERROR HANDLING ⬆️ ---
   }
 });
 

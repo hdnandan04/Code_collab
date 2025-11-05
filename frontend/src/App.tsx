@@ -1,29 +1,59 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import Workspace from "./pages/Workspace";
-import NotFound from "./pages/NotFound";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from 'react-router-dom';
+import { Toaster } from 'sonner';
 
-const queryClient = new QueryClient();
+// --- FIXED IMPORTS ---
+// Tumcha project '@/' alias vaparto, mhanun relative paths kadhun takle.
+import Workspace from '@/pages/Workspace';
+import NotFound from '@/pages/NotFound';
+import { LoginPage } from '@/pages/Login';
+import { SignupPage } from '@/pages/Signup';
+import Dashboard from '@/pages/Dashboard';
+import { isAuthenticated } from '@/lib/auth';
+// --- END OF FIX ---
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
+const ProtectedRoute = ({ element }: { element: JSX.Element }) => {
+  return isAuthenticated() ? element : <Navigate to="/login" replace />;
+};
+
+function App() {
+  return (
+    <>
+      <Router>
         <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/room/:roomId" element={<Workspace />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+
+          <Route
+            path="/"
+            element={<ProtectedRoute element={<Dashboard />} />}
+          />
+          <Route
+            path="/project/:projectId"
+            element={<ProtectedRoute element={<Workspace />} />}
+          />
+          
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+      </Router>
+      <Toaster 
+        theme="dark" 
+        position="bottom-right" 
+        toastOptions={{
+          style: {
+            background: '#0D253A',
+            border: '1px solid #06B6D4',
+            color: '#E0F2FE',
+            fontFamily: 'Space Mono, monospace',
+          },
+        }}
+      />
+    </>
+  );
+}
 
 export default App;
