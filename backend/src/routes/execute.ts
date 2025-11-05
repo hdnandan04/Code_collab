@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import axios from 'axios'; // axios is imported
+import axios, { AxiosError } from 'axios'; // <-- Import AxiosError type
+import { AuthRequest } from '../middleware/auth'; // Import AuthRequest if needed elsewhere, but good practice
 
 const router = Router();
 
@@ -86,13 +87,12 @@ router.post('/', async (req: Request<{}, {}, ExecuteRequest>, res: Response) => 
         }
       );
 
-      // --- FIX: Explicitly typed result from Axios response ---
-      const result: Judge0Result = response.data;
+      // --- FIX 1: Cast the data to the correct type to resolve TS2322 ---
+      const result: Judge0Result = response.data as Judge0Result;
       
       console.log('✅ Code executed successfully');
       
       return res.json({
-        // The check for result.stdout/stderr is now safe
         stdout: result.stdout ? Buffer.from(result.stdout, 'base64').toString() : '',
         stderr: result.stderr ? Buffer.from(result.stderr, 'base64').toString() : '',
         status: result.status.description,
@@ -107,20 +107,25 @@ router.post('/', async (req: Request<{}, {}, ExecuteRequest>, res: Response) => 
   } catch (error) {
     console.error('❌ Execution error:', error);
     
-    // --- FIX: Using the correct utility and explicit typing for error handling ---
-    if (axios.isAxiosError(error) && error.response) {
-      console.error('Axios error data:', error.response.data);
-      return res.status(500).json({
-        error: 'Execution failed',
-        stderr: JSON.stringify(error.response.data, null, 2),
-      });
+    // --- FIX 2: Use the imported instance (axios.isAxiosError) and safely check error type ---
+    if (axios.isAxiosError(error)) { // <-- FIXED: Property isAxiosError now used correctly
+        const axiosError = error as AxiosError; // Cast to AxiosError type
+        
+        if (axiosError.response) {
+            console.error('Axios error data:', axiosError.response.data);
+            return res.status(500).json({
+                error: 'Execution failed',
+                // Safely access data on the response object
+                stderr: JSON.stringify(axiosError.response.data, null, 2),
+            });
+        }
     }
     
+    // Fallback for non-Axios errors
     return res.status(500).json({
       error: 'Execution failed',
       stderr: error instanceof Error ? error.message : 'Unknown server error',
     });
-    // --- END OF FIX ---
   }
 });
 
