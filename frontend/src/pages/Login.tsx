@@ -55,7 +55,7 @@ export const LoginPage = () => {
       <Card className="w-full max-w-md bg-card border-cyan-400/50">
         <CardHeader className="items-center text-center">
           <Code2 className="w-12 h-12 text-cyan-400" />
-          <CardTitle className="text-3xl font-bold text-cyan-400">Welcome to CodeCollab</CardTitle>
+          <CardTitle className="text-3xl font-bold text-cyan-400">Welcome to DevDynamics</CardTitle>
           <CardDescription className="text-gray-400">Log in to your account</CardDescription>
         </CardHeader>
         <CardContent>
