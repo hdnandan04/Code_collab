@@ -369,7 +369,7 @@ const Dashboard = () => {
         <div className="flex items-center gap-4">
           <Code2 className="w-6 h-6 text-cyan-400" />
           <h1 className="text-xl font-bold text-cyan-100">
-            CodeCollab Dashboard
+            DevDynamics Dashboard
           </h1>
         </div>
         <Button variant="ghost" onClick={handleLogout} className="text-cyan-400 hover:text-cyan-100 hover:bg-cyan-900/50">
