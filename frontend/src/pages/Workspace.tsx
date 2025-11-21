@@ -365,7 +365,7 @@ const Workspace = () => {
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-bold flex items-center gap-2 font-vt323 text-primary text-[2rem]">
             <Code2 className="w-5 h-5 text-primary" />
-            CodeCollab
+            DevDynamics
           </h1>
           <Separator orientation="vertical" className="h-6" />
           <div className="flex items-center gap-2">
